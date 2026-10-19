@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Receipt Snap</title>
+  <meta name="theme-color" content="#dfe5ec">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/vendor/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <h1 class="mark">Receipt<span>Snap</span></h1>
+    <label class="viewing">
+      <span>Showing</span>
+      <select id="viewer" aria-label="Whose spending to show">
+        <option value="">My receipts</option>
+      </select>
+    </label>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="snap" aria-selected="true">Snap</button>
+    <button role="tab" data-view="spending" aria-selected="false">Spending</button>
+    <button role="tab" data-view="ask" aria-selected="false">Ask</button>
+    <button role="tab" data-view="engine" aria-selected="false">Engine</button>
+  </nav>
+
+  <main>
+    <!-- SNAP -->
+    <section id="snap" class="view" data-active>
+      <div class="snap-grid">
+        <div class="capture">
+          <label class="shutter" id="shutter">
+            <input id="file" type="file" accept="image/*,application/pdf" capture="environment">
+            <span class="shutter-ring" aria-hidden="true"></span>
+            <strong>Photograph a receipt</strong>
+            <small>or drop a photo or PDF here</small>
+          </label>
+          <img id="preview" alt="Receipt you uploaded" hidden>
+          <p id="snap-status" class="status" role="status"></p>
+        </div>
+
+        <form id="review" class="paper" hidden autocomplete="off">
+          <div class="paper-head">
+            <input id="r-merchant" class="merchant" aria-label="Store" required>
+            <div class="paper-meta">
+              <input id="r-date" type="date" aria-label="Purchase date">
+              <input id="r-time" type="time" aria-label="Purchase time">
+              <input id="r-pay" placeholder="Payment" aria-label="Payment method">
+            </div>
+          </div>
+          <div id="r-alerts"></div>
+          <ol id="r-items" class="lines"></ol>
+          <button type="button" id="add-line" class="ghost small">Add a line</button>
+          <dl class="sums">
+            <dt>Items</dt><dd id="r-itemsum">0.00</dd>
+            <dt><label for="r-tax">Tax</label></dt><dd><input id="r-tax" type="number" step="0.01" inputmode="decimal"></dd>
+            <dt><label for="r-tip">Tip</label></dt><dd><input id="r-tip" type="number" step="0.01" inputmode="decimal"></dd>
+            <dt class="grand"><label for="r-total">Total</label></dt><dd class="grand"><input id="r-total" type="number" step="0.01" inputmode="decimal" required></dd>
+          </dl>
+          <p id="r-balance" class="balance"></p>
+          <div class="paper-actions">
+            <button type="button" id="discard" class="ghost">Discard</button>
+            <button type="submit" class="primary">Save receipt</button>
+          </div>
+        </form>
+      </div>
+
+      <h2 class="section-title">Recent receipts</h2>
+      <ul id="recent" class="recent"></ul>
+    </section>
+
+    <!-- SPENDING -->
+    <section id="spending" class="view">
+      <div class="month-bar">
+        <select id="month" aria-label="Month"></select>
+        <p class="headline"><span id="m-total">$0</span> <span id="m-compare" class="compare"></span></p>
+      </div>
+      <div class="dash">
+        <figure class="panel wide">
+          <figcaption>Spend by category, last 12 months</figcaption>
+          <div class="chart-box tall"><canvas id="c-monthly"></canvas></div>
+        </figure>
+        <figure class="panel">
+          <figcaption>Running total this month vs last month</figcaption>
+          <div class="chart-box"><canvas id="c-pace"></canvas></div>
+        </figure>
+        <figure class="panel">
+          <figcaption>Where it went</figcaption>
+          <ul id="breakdown" class="breakdown"></ul>
+        </figure>
+        <figure class="panel">
+          <figcaption>Top stores</figcaption>
+          <ol id="merchants" class="merchants"></ol>
+        </figure>
+      </div>
+      <p class="footnote" id="dash-ms"></p>
+    </section>
+
+    <!-- ASK -->
+    <section id="ask" class="view">
+      <form id="ask-form" class="ask-form">
+        <label for="q" class="ask-label">Ask about your spending</label>
+        <div class="ask-row">
+          <input id="q" placeholder="How much did I spend on coffee in September?" required minlength="3">
+          <button class="primary" type="submit">Ask</button>
+        </div>
+        <div class="chips" id="chips"></div>
+      </form>
+      <div id="answer" class="answer" hidden>
+        <p id="a-text" class="a-text"></p>
+        <div class="chart-box"><canvas id="c-answer"></canvas></div>
+        <div id="a-table" class="table-wrap"></div>
+        <details><summary>SQL Gemini wrote</summary><pre id="a-sql"></pre></details>
+        <p class="footnote" id="a-ms"></p>
+      </div>
+    </section>
+
+    <!-- ENGINE -->
+    <section id="engine" class="view">
+      <p class="lede">Every line item is a row in a Tiger Data hypertable. Data older than 30 days is compressed into the columnstore, and the dashboard reads from continuous aggregates that update as you save receipts.</p>
+      <div class="stats" id="stats"></div>
+      <div class="bench panel">
+        <h3 id="bench-q">Benchmark</h3>
+        <div class="bench-row"><span>Raw line items</span><div class="bar"><i id="b-raw"></i></div><b id="b-raw-ms"></b></div>
+        <div class="bench-row"><span>Continuous aggregate</span><div class="bar"><i id="b-cagg" class="fast"></i></div><b id="b-cagg-ms"></b></div>
+        <button id="rerun" class="ghost small">Run again</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
