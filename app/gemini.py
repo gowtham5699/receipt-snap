@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import random
+import time
 from datetime import date
 from typing import Literal, Optional
 
 import sentry_sdk
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import BaseModel, Field
 
@@ -25,18 +28,32 @@ def client() -> genai.Client:
     return _client
 
 
+_RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
 def _generate(contents, schema, *, temperature=0.0, op="extract"):
     with sentry_sdk.start_span(op="gen_ai.generate_content", name=f"gemini {op}") as span:
         span.set_data("gen_ai.request.model", GEMINI_MODEL)
-        resp = client().models.generate_content(
-            model=GEMINI_MODEL,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                temperature=temperature,
-                response_mime_type="application/json",
-                response_schema=schema,
-            ),
-        )
+        last_exc: Exception | None = None
+        for attempt in range(4):
+            try:
+                resp = client().models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        temperature=temperature,
+                        response_mime_type="application/json",
+                        response_schema=schema,
+                    ),
+                )
+                break
+            except genai_errors.APIError as e:
+                last_exc = e
+                if getattr(e, "code", None) not in _RETRY_STATUSES or attempt == 3:
+                    raise
+                time.sleep(min(2 ** attempt, 8) + random.random())
+        else:  # pragma: no cover
+            raise last_exc  # type: ignore[misc]
         usage = getattr(resp, "usage_metadata", None)
         if usage is not None:
             span.set_data("gen_ai.usage.input_tokens", usage.prompt_token_count)
